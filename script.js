@@ -66,7 +66,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').match
 if (window.gsap && window.ScrollTrigger && !reduceMotion) {
   gsap.registerPlugin(ScrollTrigger);
 
-  /* ---- Projects: horizontal scroll-jack ---- */
+  /* ---- Projects: horizontal scroll-jack on desktop, smooth swipe on mobile ---- */
   const track = document.getElementById('projectsTrack');
   const viewport = track.parentElement;
   const cards = [...track.children];
@@ -77,20 +77,45 @@ if (window.gsap && window.ScrollTrigger && !reduceMotion) {
     return Math.max(0, track.scrollWidth - viewport.clientWidth);
   }
 
-  ScrollTrigger.create({
-    trigger: '#projects',
-    start: 'top top',
-    end: () => '+=' + (scrollDistance() + window.innerHeight * 0.6),
-    pin: '.projects-pin',
-    scrub: 0.6,
-    anticipatePin: 1,
-    invalidateOnRefresh: true,
-    onUpdate: (self) => {
-      const dist = scrollDistance();
-      track.style.transform = `translateX(${-dist * self.progress}px)`;
-      const idx = Math.min(cards.length - 1, Math.round(self.progress * (cards.length - 1)));
-      fillEl.style.width = (self.progress * 100) + '%';
-      counterEl.textContent = String(idx + 1).padStart(2, '0') + ' / ' + String(cards.length).padStart(2, '0');
+  function updateMobileProgress(){
+    const maxScroll = viewport.scrollWidth - viewport.clientWidth;
+    const progress = maxScroll > 0 ? Math.max(0, Math.min(1, viewport.scrollLeft / maxScroll)) : 0;
+    fillEl.style.width = (progress * 100) + '%';
+    const idx = Math.min(cards.length - 1, Math.round(progress * (cards.length - 1)));
+    counterEl.textContent = String(idx + 1).padStart(2, '0') + ' / ' + String(cards.length).padStart(2, '0');
+  }
+
+  viewport.addEventListener('scroll', updateMobileProgress, { passive: true });
+
+  ScrollTrigger.matchMedia({
+    // Desktop: Pin & horizontal scrub
+    "(min-width: 781px)": function() {
+      track.style.transform = "translateX(0px)";
+      const st = ScrollTrigger.create({
+        trigger: '#projects',
+        start: 'top top',
+        end: () => '+=' + (scrollDistance() + window.innerHeight * 0.6),
+        pin: '.projects-pin',
+        scrub: 0.6,
+        anticipatePin: 1,
+        invalidateOnRefresh: true,
+        onUpdate: (self) => {
+          const dist = scrollDistance();
+          track.style.transform = `translateX(${-dist * self.progress}px)`;
+          const idx = Math.min(cards.length - 1, Math.round(self.progress * (cards.length - 1)));
+          fillEl.style.width = (self.progress * 100) + '%';
+          counterEl.textContent = String(idx + 1).padStart(2, '0') + ' / ' + String(cards.length).padStart(2, '0');
+        }
+      });
+      return () => {
+        st.kill();
+        track.style.transform = "";
+      };
+    },
+    // Mobile: Free natural scrolling without pinning
+    "(max-width: 780px)": function() {
+      track.style.transform = "";
+      updateMobileProgress();
     }
   });
 
